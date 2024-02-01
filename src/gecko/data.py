@@ -6,8 +6,6 @@ import requests
 from typing import List
 
 import astropy
-import matplotlib.pyplot as plt
-import numpy as np
 from PIL import Image
 
 
@@ -21,12 +19,12 @@ class DataLoader:
         self.data_dir = os.path.abspath(data_dir)
         os.makedirs(self.data_dir, exist_ok=True)
 
+    def get_daterange(self, start_date, end_date):
+        for n in range(int((end_date - start_date).days) + 1):
+            yield start_date + datetime.timedelta(n)
+
     def get_image_by_path(self, img_path: str) -> Image:
         return Image.open(img_path)
-
-    def plot_image(self, img: Image) -> None:
-        fig, ax = plt.subplots(figsize=(10, 10), sharex=True, sharey=True)
-        ax.imshow(np.asarray(img))
 
     def download_single(self, url: str, output_path: str, download_format: str) -> None:
         try:
@@ -45,7 +43,7 @@ class DataLoader:
 class JPEGDataLoader(DataLoader):
 
     def __init__(self, camera: str, data_dir: str='./data/soho/jpeg') -> None:
-        self._year_escape_str = '+++++++++++'
+        self._year_escape_str = '<<<YEAR>>>'
         self.camera = camera
         if camera not in ('c2', 'c3'):
             raise ValueError(f'`camera` parameter should be one of these: c1, c2. You\'ve passed {camera}')
@@ -57,15 +55,17 @@ class JPEGDataLoader(DataLoader):
 
     def ls_images(self, start_datetime: datetime.datetime, end_datetime: datetime.datetime):
         # list all SOHO image basenames existing
-        pass
+        res = []
+        imgs = []
+        for _date in self.get_daterange(start_datetime.date(), end_datetime.date()):
+            imgs += self.ls_images_per_date(_date)
 
-    def ls_local_images(self, start_datetime: datetime.datetime, end_datetime: datetime.datetime):
-        pass
-
-    def get_image(self, image_name):
-        # image name is a basename like `20230723_0000_c2_1024.jpg``
-        # if doesn't persist local - download it
-        pass
+        for img in imgs:
+            img_dt = datetime.datetime.strptime(img[:13], '%Y%m%d_%H%M')
+            if img_dt < end_datetime and img_dt > start_datetime:
+                res.append(img)
+        
+        return res
 
     def ls_images_per_date(self, img_date: datetime.date) -> List[str]:
         date_str = datetime.datetime.strftime(img_date, '%Y%m%d')
@@ -78,7 +78,26 @@ class JPEGDataLoader(DataLoader):
             raise RuntimeError(f'Failed to fetch data from {ls_url}: {resp.content.decode()}')
 
         return sorted(list(set(re.findall(r'\d+_\d+_c\d_1024.jpg', resp.content.decode()))))
+    
+    def construct_url(self, img_name: str) -> str:
+        base_url = self.base_url.replace(self._year_escape_str, img_name[:4])
+        return os.path.join(base_url, img_name[:8], img_name)
 
+    def construct_local_path(self, img_name: str) -> str:
+        return os.path.join(self.data_dir, self.camera, img_name[:8], img_name)
+
+    def check_is_downloaded(self, img_name: str) -> bool:
+        return os.path.exists(self.construct_local_path(img_name))
+
+    def get_image(self, img_name) -> Image:
+        # image name is a basename like `20230723_0000_c2_1024.jpg``
+        # if doesn't persist local - download it
+        d_url = self.construct_url(img_name)
+        d_output = self.construct_local_path(img_name)
+        if self.check_is_downloaded(img_name) is False:
+            os.makedirs(os.path.join(self.data_dir, self.camera, img_name[:8]), exist_ok=True)
+            self.download_single(url=d_url, output_path=d_output, download_format='jpg')
+        return self.get_image_by_path(d_output)
 
     def download_full_date(self, download_date: datetime.date) -> None:
         date_str = datetime.datetime.strftime(download_date, '%Y%m%d')
@@ -98,7 +117,7 @@ class JPEGDataLoader(DataLoader):
 class FITSDataLoader(DataLoader):
     
     def __init__(self, camera: str, data_dir: str='./data/soho/fits') -> None:
-        self._date_escape_str = '+++++++++++'
+        self._date_escape_str = '<<<DATE>>>'
         if camera not in ('c2', 'c3'):
             raise ValueError(f'`camera` parameter should be one of these: c1, c2. You\'ve passed {camera}')
 

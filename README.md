@@ -2,6 +2,8 @@
 
 It's a small tool for working with 'SOHO' mission images. Aims to help the "Sungrazer" comet hunting project.
 
+<img src="test.gif" height=500 width=500/>
+
 Currently available features:
 
 - image data loader

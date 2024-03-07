@@ -10,4 +10,4 @@ def create_gif(images: List[JpegImageFile], output_path: str) -> None:
 
 
 def display_gif(gif_path):
-    return display.HTML('<img src="{}">'.format(gif_path))
+    return display.Image(filename=gif_path, embed=True)

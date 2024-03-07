@@ -5,7 +5,6 @@ import re
 import requests
 from typing import List
 
-import astropy
 from PIL import Image
 
 
@@ -46,7 +45,7 @@ class JPEGDataLoader(DataLoader):
         self._year_escape_str = '<<<YEAR>>>'
         self.camera = camera
         if camera not in ('c2', 'c3'):
-            raise ValueError(f'`camera` parameter should be one of these: c1, c2. You\'ve passed {camera}')
+            raise ValueError(f'`camera` parameter should be one of these: c2, c3. You\'ve passed {camera}')
 
         super().__init__(
             base_url=f'https://soho.nascom.nasa.gov/data/REPROCESSING/Completed/{self._year_escape_str}/{camera}/',
@@ -112,16 +111,3 @@ class JPEGDataLoader(DataLoader):
             if not os.path.exists(d_output):
                 logger.info(f'Downloading {d_url} to {d_output}')
                 self.download_single(d_url, d_output, 'jpg')
-
-
-class FITSDataLoader(DataLoader):
-    
-    def __init__(self, camera: str, data_dir: str='./data/soho/fits') -> None:
-        self._date_escape_str = '<<<DATE>>>'
-        if camera not in ('c2', 'c3'):
-            raise ValueError(f'`camera` parameter should be one of these: c1, c2. You\'ve passed {camera}')
-
-        super().__init__(
-            base_url=f'https://umbra.nascom.nasa.gov/pub/lasco_level05/{self._date_escape_str}/{camera}/',
-            data_dir=data_dir
-        )

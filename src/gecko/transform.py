@@ -71,6 +71,37 @@ class Simplifier:
                     img_copy[i][j] = [255, 255, 255, 255]
 
         return Image.fromarray(img_copy)
+    
+    def compose(self, images: List[JpegImageFile]) -> JpegImageFile:
+        """
+        ! Images must be datetime sorted
+        """
+        composed_image = np.ndarray(shape=(1024,1024,4), dtype=np.uint8)
+        composed_image.fill(255)
+        for image in images:
+            img_pil = image.convert('RGBA') 
+            image_arr = np.asarray(img_pil)
+            img_copy = image_arr.copy()
+            img_copy.setflags(write=1)
+            for i in range(img_copy.shape[0]):
+                for j in range(img_copy.shape[1]):
+                    if all([img_copy[i][j][0] == 0, img_copy[i][j][1] == 0, img_copy[i][j][2] == 0]):
+                        composed_image[i][j] = [0, 0, 0, 255]
+        return composed_image
+
+
+class Composer:
+    """
+    This transformer simply combines images by given predicate rules for RGB channels.
+    E.g. rules
+    """
+    def __init__(self, rules=('>0', '=0', '=0')) -> None:
+        self.R_rule = rules[0]
+        self.G_rule = rules[1]
+        self.B_rule = rules[2]
+
+    def compose(self, images: List[JpegImageFile]) -> JpegImageFile:
+        pass
 
 
 class Blender:

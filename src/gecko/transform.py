@@ -1,9 +1,26 @@
 from functools import reduce
 from typing import List, Optional
+from multiprocessing import Pool
+import os
 
 import numpy as np
 from PIL import Image
 from PIL.JpegImagePlugin import JpegImageFile
+
+
+PARALLELISM = int(os.environ.get('GECKO_PARALLELISM', 4))
+IMG_HEIGHT = int(os.environ.get('GECKO_IMG_HEIGHT', 1024))
+
+
+def slice_img_indexes(img_height, num_threads):
+    res = []
+    for i in range(num_threads):
+        for j in range(num_threads):
+            res.append([
+                i*img_height//num_threads, (i+1)*img_height//num_threads,
+                j*img_height//num_threads, (j+1)*img_height//num_threads
+            ])
+    return res
 
 
 class Simplifier:
@@ -22,9 +39,11 @@ class Simplifier:
     -------
 
     Methods:
-        transform(image: JpegImageFile) -> JpegImageFile
-            Compose image by blending an array of images.
-
+        transform(images: List[JpegImageFile]) -> List[JpegImageFile]
+            Simplify and array of images.
+            
+        compose(images: List[JpegImageFile]) -> JpegImageFile
+            Compose image by adding glowing dots from each individual image and preserving ordering in 4th channel.
     -------
 
     Example:
@@ -51,18 +70,20 @@ class Simplifier:
 
         self.level = level
         self.add_pixels = add_pixels
-    
-    def transform(self, image: JpegImageFile) -> JpegImageFile:
+
+    @staticmethod
+    def _do_transform(image, level, add_pixels):
         img_pil = image.convert('RGBA') 
         image_arr = np.asarray(img_pil)
         img_copy = image_arr.copy()
         img_copy.setflags(write=1)
+
         for i in range(img_copy.shape[0]):
             for j in range(img_copy.shape[1]):
-                if all([img_copy[i][j][0] > self.level, img_copy[i][j][1] > self.level, img_copy[i][j][2] > self.level]):
+                if all([img_copy[i][j][0] > level, img_copy[i][j][1] > level, img_copy[i][j][2] > level]):
                     img_copy[i][j] = [0, 0, 0, 255]
-                    for i_delta in range(-self.add_pixels, self.add_pixels):
-                        for j_delta in range(-self.add_pixels, self.add_pixels):
+                    for i_delta in range(-add_pixels, add_pixels):
+                        for j_delta in range(-add_pixels, add_pixels):
                             try:
                                 img_copy[i+i_delta][j+j_delta] = [0, 0, 0, 255]
                             except:
@@ -71,8 +92,12 @@ class Simplifier:
                     img_copy[i][j] = [255, 255, 255, 255]
 
         return Image.fromarray(img_copy)
-    
-    def compose(self, images: List[JpegImageFile]) -> JpegImageFile:
+
+    def transform(self, images: List[JpegImageFile]) -> List[JpegImageFile]:
+        with Pool(processes=PARALLELISM) as p:
+            return p.starmap(self._do_transform, [(x, self.level, self.add_pixels) for x in images])
+
+    def compose(self, images: List[JpegImageFile]      >>>>>> CustomImage?) -> JpegImageFile:
         """
         ! Images must be datetime sorted
         """
@@ -88,20 +113,6 @@ class Simplifier:
                     if all([img_copy[i][j][0] == 0, img_copy[i][j][1] == 0, img_copy[i][j][2] == 0]):
                         composed_image[i][j] = [0, 0, 0, 255]
         return composed_image
-
-
-class Composer:
-    """
-    This transformer simply combines images by given predicate rules for RGB channels.
-    E.g. rules
-    """
-    def __init__(self, rules=('>0', '=0', '=0')) -> None:
-        self.R_rule = rules[0]
-        self.G_rule = rules[1]
-        self.B_rule = rules[2]
-
-    def compose(self, images: List[JpegImageFile]) -> JpegImageFile:
-        pass
 
 
 class Blender:

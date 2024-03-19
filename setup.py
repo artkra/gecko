@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="gecko_soho",
-    version="0.0.6",   
+    version="0.0.7",   
     author="Artem Krasnyi",
     author_email='artkrasnyy@gmail.com',
     url='https://github.com/artkra/gecko',
@@ -19,8 +19,8 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.9',
-    py_modules=["gecko"],
-    package_dir={'':'src/gecko'},
+    py_modules=["gecko.data", "gecko.utils", "gecko.transform"],
+    package_dir={'':'src'},
     install_requires=[
         "numpy>=1.24.0",
         "Pillow>=8.3.2",

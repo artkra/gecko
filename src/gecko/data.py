@@ -11,6 +11,50 @@ from PIL import Image
 logger = logging.getLogger()
 
 
+class SOHOImage:
+    """
+    Custom image type with timestamp attributes.
+
+    -------
+
+    Attributes:
+        image: Image
+            PIL image object.
+
+        timestamp: int
+            Image timestamp parsed from the SOHO image name.
+
+        camera: str
+            c2/c3
+
+        size: int
+            Usually (always) it's 1024 pixels.
+    """
+    # image name is a basename like `20230723_0000_c2_1024.jpg`
+    def __init__(
+            self,
+            image: Image,
+            image_name: str=None,
+            camera: str=None,
+            size: str=None,
+            timestamp: int=None,
+
+    ) -> None:
+        self.image = image
+        if image_name is None and timestamp is None:
+            raise ValueError('You must provide either valid image name in format `20230723_0000_c2_1024.jpg` or at least a timestamp.')
+
+        self.camera = camera or image_name[14:16]
+        self.size = size or image_name.rstrip('.jpg')[17:]
+        self.timestamp = timestamp or round(datetime.datetime.strptime(image_name[:13], '%Y%m%d_%H%M').timestamp())
+
+    def new_image(self, image: Image) -> 'SOHOImage':
+        """
+        Fork the image with original metadata
+        """
+        return SOHOImage(image=image, camera=self.camera, size=self.size, timestamp=self.timestamp)
+
+
 class DataLoader:
 
     def __init__(self, base_url: str, data_dir='./data/soho/tmp') -> None:
@@ -22,8 +66,9 @@ class DataLoader:
         for n in range(int((end_date - start_date).days) + 1):
             yield start_date + datetime.timedelta(n)
 
-    def get_image_by_path(self, img_path: str) -> Image:
-        return Image.open(img_path)
+    def get_image_by_path(self, img_path: str) -> SOHOImage:
+        soho_image = SOHOImage(image=Image.open(img_path), image_name=os.path.basename(img_path))
+        return soho_image
 
     def download_single(self, url: str, output_path: str, download_format: str) -> None:
         try:
@@ -88,8 +133,8 @@ class JPEGDataLoader(DataLoader):
     def check_is_downloaded(self, img_name: str) -> bool:
         return os.path.exists(self.construct_local_path(img_name))
 
-    def get_image(self, img_name) -> Image:
-        # image name is a basename like `20230723_0000_c2_1024.jpg``
+    def get_image(self, img_name) -> SOHOImage:
+        # image name is a basename like `20230723_0000_c2_1024.jpg`
         # if doesn't persist local - download it
         d_url = self.construct_url(img_name)
         d_output = self.construct_local_path(img_name)

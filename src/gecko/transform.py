@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image
 from PIL.JpegImagePlugin import JpegImageFile
 
+from .data import SOHOImage
+
 
 PARALLELISM = int(os.environ.get('GECKO_PARALLELISM', 4))
 IMG_HEIGHT = int(os.environ.get('GECKO_IMG_HEIGHT', 1024))
@@ -72,8 +74,9 @@ class Simplifier:
         self.add_pixels = add_pixels
 
     @staticmethod
-    def _do_transform(image, level, add_pixels):
-        img_pil = image.convert('RGBA') 
+    def _do_transform(image: SOHOImage, level, add_pixels):
+        _image = image.image 
+        img_pil = _image.convert('RGBA') 
         image_arr = np.asarray(img_pil)
         img_copy = image_arr.copy()
         img_copy.setflags(write=1)
@@ -91,20 +94,20 @@ class Simplifier:
                 else:
                     img_copy[i][j] = [255, 255, 255, 255]
 
-        return Image.fromarray(img_copy)
+        return image.new_image(Image.fromarray(img_copy))
 
-    def transform(self, images: List[JpegImageFile]) -> List[JpegImageFile]:
+    def transform(self, images: List[SOHOImage]) -> List[SOHOImage]:
         with Pool(processes=PARALLELISM) as p:
             return p.starmap(self._do_transform, [(x, self.level, self.add_pixels) for x in images])
 
-    def compose(self, images: List[JpegImageFile]      >>>>>> CustomImage?) -> JpegImageFile:
+    def compose(self, images: List[SOHOImage]) -> JpegImageFile:
         """
         ! Images must be datetime sorted
         """
         composed_image = np.ndarray(shape=(1024,1024,4), dtype=np.uint8)
         composed_image.fill(255)
         for image in images:
-            img_pil = image.convert('RGBA') 
+            img_pil = image.image.convert('RGBA') 
             image_arr = np.asarray(img_pil)
             img_copy = image_arr.copy()
             img_copy.setflags(write=1)
@@ -156,17 +159,12 @@ class Blender:
             raise ValueError(f'Alpha value must be an integer between 0 and 255. Given: {alpha}')
         self.alpha = round(alpha)
 
-    def blend(self, images: List[JpegImageFile]) -> JpegImageFile:
+    def blend(self, images: List[SOHOImage]) -> JpegImageFile:
         alpha = self.alpha or round(255/len(images)) + 5
         img_copies = []
-        for img in images:
+        _images = [x.image for x in images]
+        for img in _images:
             img_copy = img.copy()
             img_copy.putalpha(alpha)
             img_copies.append(img_copy)
         return reduce(Image.alpha_composite, img_copies)
-    
-
-class Amplifier:
-    """
-    The class 
-    """

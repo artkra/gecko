@@ -100,13 +100,16 @@ class Simplifier:
         with Pool(processes=PARALLELISM) as p:
             return p.starmap(self._do_transform, [(x, self.level, self.add_pixels) for x in images])
 
-    def compose(self, images: List[SOHOImage]) -> JpegImageFile:
+    def compose(self, images: List[SOHOImage]) -> np.ndarray:
         """
         ! Images must be datetime sorted
         """
+        if len(images) > 20:
+            raise ValueError('Too many images. Try using 10~20 images at most.')
+
         composed_image = np.ndarray(shape=(1024,1024,4), dtype=np.uint8)
         composed_image.fill(255)
-        for image in images:
+        for im_index, image in enumerate(sorted(images, key=lambda x: x.timestamp)):
             img_pil = image.image.convert('RGBA') 
             image_arr = np.asarray(img_pil)
             img_copy = image_arr.copy()
@@ -114,7 +117,7 @@ class Simplifier:
             for i in range(img_copy.shape[0]):
                 for j in range(img_copy.shape[1]):
                     if all([img_copy[i][j][0] == 0, img_copy[i][j][1] == 0, img_copy[i][j][2] == 0]):
-                        composed_image[i][j] = [0, 0, 0, 255]
+                        composed_image[i][j] = [0, 0, 0, 200 + im_index]  # we write an index in an alpha channel to preserve ability to validate a movement
         return composed_image
 
 
